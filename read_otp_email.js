@@ -20,7 +20,7 @@ async function getLatestOtpEmail(sender) {
         // 1️⃣ Search for unread email from given sender
         const listRes = await gmail.users.messages.list({
             userId: 'me',
-            q: `is:read from:${sender}`,
+            q: `is:unread from:${sender}`,
             maxResults: 1
         });
         console.log("here", listRes.data)
@@ -69,7 +69,7 @@ async function getLatestOtpEmail(sender) {
 
 // Example usage:
 // getLatestOtpEmail('no-reply@naukri.com');
-getLatestOtpEmail('info@naukri.com');
+// getLatestOtpEmail('info@naukri.com');
 
 
 module.exports = getLatestOtpEmail;
