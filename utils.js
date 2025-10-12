@@ -4,7 +4,7 @@ const path = require("path");
 const fs = require("fs");
 const FormData = require("form-data");
 const getLatestOtpEmail = require("./read_otp_email");
-const {HttpsProxyAgent} = require('https-proxy-agent');
+const { HttpsProxyAgent } = require('https-proxy-agent');
 
 let cronExpression = "0 8 * * *";
 let resumeCronExpression = "30 8 * * *";
@@ -50,7 +50,7 @@ async function login(username, password) {
     if (err.response && err.response.status === 403) {
       console.log("🔐 OTP required. Fetching OTP from Gmail...");
 
-      const otp = await getLatestOtpEmail("info@naukri.com>");
+      const otp = await getLatestOtpEmail("info@naukri.com");
 
       if (!otp) {
         return err.response.data;
