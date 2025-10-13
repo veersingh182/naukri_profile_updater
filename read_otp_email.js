@@ -16,7 +16,7 @@ const gmail = google.gmail({ version: 'v1', auth: oAuth2Client });
 async function getLatestOtpEmail(sender) {
     try {
 
-        console.log(process.env.GMAIL_CLIENT_ID, process.env.GMAIL_CLIENT_SECRET, process.env.GMAIL_REFRESH_TOKEN);
+        // console.log(process.env.GMAIL_CLIENT_ID, process.env.GMAIL_CLIENT_SECRET, process.env.GMAIL_REFRESH_TOKEN);
         // 1️⃣ Search for unread email from given sender
         const listRes = await gmail.users.messages.list({
             userId: 'me',

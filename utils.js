@@ -77,7 +77,7 @@ async function login(username, password) {
           "https://www.naukri.com/central-login-services/v0/otp-login",
           {
             flowId: "mfa-login-email",
-            otp,
+            token: otp,
             username,
           },
           {
