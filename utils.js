@@ -47,10 +47,24 @@ async function login(username, password) {
   } catch (err) {
     console.log("Login error:", err, err.response?.data || err.message);
 
-    if (err.response && err.response.status === 403) {
+    if (err.response && err.response.status === 403 && err.response.data?.message === "MFA required" ) {
       console.log("🔐 OTP required. Fetching OTP from Gmail...");
 
-      const otp = await getLatestOtpEmail("info@naukri.com");
+      let otp = null;
+      let retries = 0;
+
+      while (!otp && retries < 100) {
+        console.log(`⏳ Waiting for OTP... (${retries}/100)`);
+        await new Promise(r => setTimeout(r, 5000));
+
+        otp = await getLatestOtpEmail("info@naukri.com")
+        if (otp) break;
+        retries++;
+      }
+
+      if (!otp) {
+        throw new Error("❌ OTP not received within timeout period.");
+      }
 
       if (!otp) {
         return err.response.data;
@@ -74,9 +88,9 @@ async function login(username, password) {
             },
           }
         );
-        return response_otp.data;
+        return response_otp?.data;
       } catch (error) {
-        return err.response.data;
+        return error.response?.data;
       }
 
     }

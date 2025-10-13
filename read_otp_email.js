@@ -20,7 +20,8 @@ async function getLatestOtpEmail(sender) {
         // 1️⃣ Search for unread email from given sender
         const listRes = await gmail.users.messages.list({
             userId: 'me',
-            q: `is:unread from:${sender}`,
+            // q: `is:unread from:${sender}`,
+            q: `in:inbox is:unread from:${sender} after:${Math.floor(Date.now() / 1000) - 60} subject:"Your OTP for logging in Naukri account"`,
             maxResults: 1
         });
         console.log("here", listRes.data)
