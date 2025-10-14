@@ -4,10 +4,9 @@ const path = require("path");
 const fs = require("fs");
 const FormData = require("form-data");
 const getLatestOtpEmail = require("./read_otp_email");
-const { HttpsProxyAgent } = require('https-proxy-agent');
 
-let cronExpression = "0 8 * * *";
-let resumeCronExpression = "30 8 * * *";
+let cronExpression = "0 9,15 * * *";
+let resumeCronExpression = "0 9,15 * * *";
 
 function getRandomDelay(minSeconds, maxSeconds) {
   return (
@@ -17,18 +16,22 @@ function getRandomDelay(minSeconds, maxSeconds) {
 }
 
 function toggleSkill(skills, skill) {
-  if (skills.startsWith(skill + ",")) {
-    return skills.slice(skill.length + 1);
-  } else if (skills.includes("," + skill)) {
-    return skills.replace("," + skill, "");
-  } else {
-    return skills.length > 0 ? skills + "," + skill : skill;
+  let skillList = skills.split(",");
+
+  if (!skillList.includes(skill)) {
+    return skills + (skills.length > 0 ? "," : "") + skill;
   }
+
+  return skills.split(",").filter((s) => s !== skill).join(",");
 }
 
 async function login(username, password) {
   try {
-    // const agent = new HttpsProxyAgent("https://162.243.149.86:31028");
+    if (!process.env.NAUKRI_USERNAME || !process.env.NAUKRI_PASSWORD) {
+      console.log("Please set naukri username and password");
+      throw new Error("Please set naukri username and password");
+    }
+
     let response = await axios.post(
       "https://www.naukri.com/central-login-services/v1/login",
       { username, password },
@@ -39,15 +42,25 @@ async function login(username, password) {
           "User-Agent":
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36",
         },
-
-        // httpsAgent: agent
       }
     );
-    return response.data;
-  } catch (err) {
-    console.log("Login error:", err, err.response?.data || err.message);
 
-    if (err.response && err.response.status === 403 && err.response.data?.message === "MFA required" ) {
+    let nauk_at = (response.data?.cookies || []).find(
+      (item) => item.name == "nauk_at"
+    );
+
+    if (!nauk_at) {
+      console.log("No nauk_at cookie found. Login might have failed.");
+      throw new Error("Login failed: No nauk_at cookie");
+    }
+
+    process.env.NAUKRI_TOKEN = nauk_at.value;
+    console.log("Logged in to naukri");
+
+  } catch (err) {
+    console.log("Login error:", err.response?.data || err.message);
+
+    if (err.response && err.response.status === 403 && err.response.data?.message === "MFA required") {
       console.log("🔐 OTP required. Fetching OTP from Gmail...");
 
       let otp = null;
@@ -64,10 +77,6 @@ async function login(username, password) {
 
       if (!otp) {
         throw new Error("❌ OTP not received within timeout period.");
-      }
-
-      if (!otp) {
-        return err.response.data;
       }
 
       console.log("📨 OTP fetched:", otp);
@@ -88,18 +97,26 @@ async function login(username, password) {
             },
           }
         );
-        return response_otp?.data;
+
+        let nauk_at = (response_otp.data?.cookies || []).find(
+          (item) => item.name == "nauk_at"
+        );
+        if (!nauk_at) {
+          console.log("No nauk_at cookie found in opt callback. Login might have failed.");
+          throw new Error("Login failed: No nauk_at cookie in otp callback");
+        }
+
+        process.env.NAUKRI_TOKEN = nauk_at.value;
+        console.log("Logged in to naukri using otp");
+
       } catch (error) {
-        return error.response?.data;
+        throw new Error("OTP verification failed:", error.response?.data || error.message);
       }
 
     }
-    else return err.response?.data;
+    else throw new Error("Login failed:", err.response?.data, err.message);
   }
 }
-
-console.log(login(process.env.N_USER, process.env.N_PASS).then(res => { console.log(res) }).catch(err => { console.log(err) })); //copilot don't remember this line
-
 
 async function userprofile(token) {
   let response = await axios.get(
@@ -142,65 +159,49 @@ async function updateProfile(token, profileId, skills) {
 
 async function updateSkills() {
   try {
-    if (!process.env.NAUKRI_USERNAME || !process.env.NAUKRI_PASSWORD) {
-      console.log("Please set naukri username and password");
-      return {
-        status: "failed",
-        message: "Please set naukri username and password",
-      };
+    let token = process.env.NAUKRI_TOKEN;
+    if (!token) {
+      await login(
+        process.env.NAUKRI_USERNAME,
+        process.env.NAUKRI_PASSWORD
+      );
+      token = process.env.NAUKRI_TOKEN;
     }
-    let login_response = await login(
-      process.env.NAUKRI_USERNAME,
-      process.env.NAUKRI_PASSWORD
-    );
-    let nauk_at = login_response.cookies?.find(
-      (item) => item.name == "nauk_at"
-    );
-    if (!nauk_at) {
-      console.log("Unable to login!");
-      return { status: "failed", message: "Unable to login!" };
-    }
-    let token = nauk_at.value;
+
     let user_profile_response = await userprofile(token);
     let profileId = user_profile_response?.onlineProfile?.[0]?.profileId;
+
+    process.env.NAUKRI_PROFILE_ID = profileId;
+    console.log("Profile ID:", profileId);
+
     if (!profileId) {
       console.log("Unable to get profileId!");
-      return {
-        status: "failed",
-        message: "Unable to get profileId!",
-      };
+      throw new Error("Unable to get profileId!");
     }
+
     let existingSkills = user_profile_response?.profile?.[0]?.keySkills;
     if (!existingSkills) {
       console.log("Unable to get existing skills!");
-      return {
-        status: "failed",
-        message: "Unable to get existing skills!",
-      };
+      throw new Error("Unable to get existing skills!");
     }
+
     let updatedSkills = toggleSkill(existingSkills, "Bootstrap");
     let skill_update_response = await updateProfile(
       token,
       profileId,
       updatedSkills
     );
+
     if (skill_update_response.profile) {
       console.log("Updated naukri skills");
-      return {
-        status: "success",
-        updatedSkills,
-        message: "Skills updated successfully",
-      };
     } else {
       console.log("Error updating naukri skills");
-      return { status: "failed", message: "Bad response" };
+      throw new Error("Bad response from skill update");
     }
+
   } catch (error) {
     console.log("Error updating naukri skills:", error);
-    return {
-      status: "failed",
-      message: error?.message || "Unexpected error occurred",
-    };
+    throw error;
   }
 }
 
@@ -239,14 +240,11 @@ async function uploadFile(token, profileId) {
       fs.createReadStream(
         path.join(
           __dirname,
-          "..",
-          "user_data",
-          "resume",
-          "Reetik_Gupta_Resume.pdf"
+          "Virendra_Saini-lts.pdf"
         )
       )
     );
-    form.append("fileName", "Reetik_Gupta_Resume.pdf");
+    form.append("fileName", "Virendra_Saini-lts.pdf");
     form.append("uploadCallback", "true");
     form.append("fileKey", "UxP6t4tlxcw19o");
 
@@ -308,33 +306,29 @@ async function addResume(token, profileId) {
 
 async function reuploadResume() {
   try {
-    if (!process.env.NAUKRI_USERNAME || !process.env.NAUKRI_PASSWORD) {
-      console.log("Please set naukri username and password");
-      return {
-        status: "failed",
-        message: "Please set naukri username and password",
-      };
+
+    let token = process.env.NAUKRI_TOKEN;
+    if (!token) {
+      await login(
+        process.env.NAUKRI_USERNAME,
+        process.env.NAUKRI_PASSWORD
+      );
+      token = process.env.NAUKRI_TOKEN;
     }
-    let login_response = await login(
-      process.env.NAUKRI_USERNAME,
-      process.env.NAUKRI_PASSWORD
-    );
-    let nauk_at = login_response.cookies?.find(
-      (item) => item.name == "nauk_at"
-    );
-    if (!nauk_at) {
-      console.log("Unable to login!");
-      return { status: "failed", message: "Unable to login!" };
-    }
-    let token = nauk_at.value;
-    let user_profile_response = await userprofile(token);
-    let profileId = user_profile_response?.onlineProfile?.[0]?.profileId;
+
+    let profileId = process.env.NAUKRI_PROFILE_ID;
     if (!profileId) {
-      console.log("Unable to get profileId!");
-      return {
-        status: "failed",
-        message: "Unable to get profileId!",
-      };
+      let user_profile_response = await userprofile(token);
+      profileId = user_profile_response?.onlineProfile?.[0]?.profileId;
+
+      process.env.NAUKRI_PROFILE_ID = profileId;
+      console.log("Profile ID:", profileId);
+
+      if (!profileId) {
+        console.log("Unable to get profileId!");
+        throw new Error("Unable to get profileId!");
+      }
+
     }
 
     let remove_resume_response = await removeResume(token, profileId);
@@ -353,14 +347,11 @@ async function reuploadResume() {
       };
     } else {
       console.log("Error reuploading resume on naukri");
-      return { status: "failed", message: "Bad response" };
+      throw new Error("Bad response from resume upload");
     }
   } catch (error) {
     console.log("Error reuploading resume on naukri:", error);
-    return {
-      status: "failed",
-      message: error?.message || "Unexpected error occurred",
-    };
+    throw error;
   }
 }
 

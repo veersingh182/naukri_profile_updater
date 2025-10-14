@@ -50,11 +50,7 @@ async function getLatestOtpEmail(sender) {
             msgRes.data.payload.parts?.[0]?.body?.data ||
             msgRes.data.payload.body?.data;
 
-        console.log('Encoded Body Data:', bodyData);
-
         const emailBody = Buffer.from(bodyData, 'base64').toString('utf-8');
-
-        console.log('Email Body:', emailBody);
 
         // 4️⃣ Extract OTP (simple regex: 4-8 digits)
         const otpMatch = emailBody.match(/<td[^>]*>(\d{6})<\/td>/);
