@@ -157,10 +157,11 @@ async function updateProfile(token, profileId, skills) {
   return response.data;
 }
 
-async function updateSkills() {
+async function updateSkills(retry = 0) {
   try {
     let token = process.env.NAUKRI_TOKEN;
     if (!token) {
+      console.log("No token found, logging in...");
       await login(
         process.env.NAUKRI_USERNAME,
         process.env.NAUKRI_PASSWORD
@@ -200,8 +201,19 @@ async function updateSkills() {
     }
 
   } catch (error) {
-    console.log("Error updating naukri skills:", error);
-    throw error;
+    console.log("Error updating naukri skills:", error.response || error);
+    if(error.response && error.response?.status === 401 && error.response?.statusText === "Unauthorized" && retry < 3) {
+      console.log("Token might have expired, retrying login and resume upload...");
+
+      await login(
+        process.env.NAUKRI_USERNAME,
+        process.env.NAUKRI_PASSWORD
+      );
+      token = process.env.NAUKRI_TOKEN;
+      return await updateSkills(retry + 1);
+    }
+
+    else throw error;
   }
 }
 
@@ -223,11 +235,7 @@ async function removeResume(token, profileId) {
     );
     return response.data;
   } catch (error) {
-    console.log(error);
-    throw new Error(
-      "Upload failed:",
-      error.response?.data || error.message
-    );
+    throw error;
   }
 }
 
@@ -264,11 +272,7 @@ async function uploadFile(token, profileId) {
     );
     return response.data;
   } catch (error) {
-    console.log(error);
-    throw new Error(
-      "Upload failed:",
-      error.response?.data || error.message
-    );
+    throw error;
   }
 }
 
@@ -296,19 +300,16 @@ async function addResume(token, profileId) {
     );
     return response.data;
   } catch (error) {
-    console.log(error);
-    throw new Error(
-      "Upload failed:",
-      error.response?.data || error.message
-    );
+    throw error;
   }
 }
 
-async function reuploadResume() {
+async function reuploadResume(retry = 0) {
   try {
 
     let token = process.env.NAUKRI_TOKEN;
     if (!token) {
+      console.log("No token found, logging in...");
       await login(
         process.env.NAUKRI_USERNAME,
         process.env.NAUKRI_PASSWORD
@@ -350,8 +351,19 @@ async function reuploadResume() {
       throw new Error("Bad response from resume upload");
     }
   } catch (error) {
-    console.log("Error reuploading resume on naukri:", error);
-    throw error;
+    console.log("Error reuploading resume on naukri:", error.response || error);
+    if(error.response && error.response?.status === 401 && error.response?.statusText === "Unauthorized" && retry < 3) {
+      console.log("Token might have expired, retrying login and resume upload...");
+
+      await login(
+        process.env.NAUKRI_USERNAME,
+        process.env.NAUKRI_PASSWORD
+      );
+      token = process.env.NAUKRI_TOKEN;
+      return await reuploadResume(retry + 1);
+    }
+
+    else throw error;
   }
 }
 

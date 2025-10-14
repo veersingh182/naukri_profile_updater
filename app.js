@@ -15,6 +15,9 @@ app.use(cors());
 app.use(express.json());
 app.use(morgan('dev'));
 
+updateSkillsCron();
+reuploadResumeCron();
+
 app.get('/naukari/stats', (req, res) => {
   res.status(200).json({ status: 'Server is running', uptime: process.uptime() });
 });
