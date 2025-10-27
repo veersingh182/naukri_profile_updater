@@ -14,7 +14,7 @@ jobs:
         run: |
           echo "🔹 Trigger Time: $(date '+%Y-%m-%d %H:%M:%S %Z')"
 
-          URL="https://naukri-profile-updator.onrender.com/naukari/stats"
+          URL="https://naukri-profile-updator.onrender.com/naukri/stats"
           echo "Pinging: $URL"
 
           RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
