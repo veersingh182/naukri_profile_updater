@@ -18,11 +18,11 @@ app.use(morgan('dev'));
 updateSkillsCron();
 reuploadResumeCron();
 
-app.get('/naukari/stats', (req, res) => {
+app.get('/naukri/stats', (req, res) => {
   res.status(200).json({ status: 'Server is running', uptime: process.uptime() });
 });
 
-app.get('/naukari/update-skills', async (req, res, next) => {
+app.get('/naukri/update-skills', async (req, res, next) => {
   try {
     const result = await updateSkills();
     res.status(200).json(result);
@@ -31,7 +31,7 @@ app.get('/naukari/update-skills', async (req, res, next) => {
   }
 });
 
-app.get('/naukari/reupload-resume', async (req, res, next) => {
+app.get('/naukri/reupload-resume', async (req, res, next) => {
   try {
     const result = await reuploadResume();
     res.status(200).json(result);
